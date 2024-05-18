@@ -1,0 +1,322 @@
+---
+title: "Clustering"
+format: html
+editor: visual
+---
+
+# Prerequisitos
+Las siguientes notas se basan en las desarrolladas en años anteriores por Eduardo Castro.
+-   Anaconda (2024.02-1)
+-   R (4.0.0) y Rstudio (2024.04.1+748 \| Released: 2024-05-11)
+-   Quarto
+-   Visual Studio code con complmentos de Jupyter Notebook
+-   Los siguientes paquetes de R se requieren:
+
+```{r, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+library(reticulate)
+library(cluster)
+library(factoextra) # Método silhoute
+library(dbscan) # Para método alternativo de k-means
+library(klaR) # Para k mediods
+
+```
+
+# Metodologías para número de clusters
+
+```{r}
+iris_data <- iris[,1:2]
+head(iris_data)
+```
+
+Graficamos esta nube de puntos:
+
+```{r}
+ggplot(data = iris_data, aes(x = Sepal.Length, y = Sepal.Width)) + geom_point() + theme_bw()
+```
+
+## Método Silhoute
+
+El algoritmo en R realiza lo siguiente para calcular el coeficiente de silhouette:
+
+-   Para cada observación en el conjunto de datos, se calcula la distancia media al resto de observaciones dentro de su propio clúster (a) y la distancia media al resto de observaciones en el clúster más cercano diferente (b).
+-   El coeficiente de silhouette para cada observación se calcula como (b - a) / max(a, b).
+-   El coeficiente de silhouette promedio para el conjunto de datos se calcula como el promedio de los coeficientes de silhouette individuales.
+
+Con este coeficiente podemos encontrar el número óptimo de clusters:
+
+```{r}
+fviz_nbclust(iris_data,kmeans, method = "silhouette",k.max=20)
+```
+
+## Método de distancia cuadrada dentro
+
+La suma de los cuadrados dentro del clúster (WSS) es una medida de cuán cohesivos son los clústeres, es decir, cuán cerca están los puntos dentro de un clúster entre sí. El método de codo consiste en calcular la WSS para diferentes valores de k (número de clústeres) y graficar estos valores en función de k. La idea es identificar el "codo" en la curva, que es el punto donde la WSS comienza a disminuir de manera más lenta. Este punto indica el número óptimo de clústeres, ya que agregar más clústeres a partir de este punto no proporciona una mejora significativa en la cohesión dentro de los clústeres.
+
+Las fórmulas para calcular la WSS son las siguientes:
+
+Para cada clúster $C_i$
+
+Se calcula la distancia cuadrada de cada punto al centroide del clúster $\mu_i$
+
+Se suman estas distancias cuadradas para obtener la WSS del clúster $WSS_i$
+
+$$WSS_i = \sum_{x \in C_i} (x - \mu_i )^2$$
+La suma de cuadrados dentro:
+
+```{r}
+fviz_nbclust(iris_data,kmeans, method = "wss",k.max=20)
+
+```
+
+## Estadística de brecha
+
+El método de estadísticas de brecha compara la dispersión intra-clúster de un conjunto de datos con la que se esperaría si los datos fueran generados aleatoriamente sin estructura de clústeres. La idea es que si los datos tienen una estructura de clústeres significativa, la dispersión intra-clúster será mayor que en datos aleatorios.
+
+El método de estadísticas de brecha se calcula en tres pasos:
+
+- Se ajustan modelos de clustering para diferentes valores de k (número de clústeres).
+- Se calcula la estadística de brecha para cada valor de 𝑘
+k, que mide la diferencia entre la dispersión intra-clúster observada y la esperada bajo una referencia nula (datos aleatorios).
+- Se selecciona el valor de𝑘k que maximiza la estadística de brecha.
+
+
+Dispersión Intra-Clúster Observada ($W_k$: Se calcula la suma de los cuadrados dentro del clúster para el valor de k. Esta medida representa qué tan compactos son los clústeres en los datos reales.
+
+Dispersión Intra-Clúster Esperada ($W_{kb}$): Se calcula la dispersión intra-clúster para un conjunto de datos aleatorios con el mismo número de puntos y la misma distribución de características que los datos originales. Este cálculo se realiza promediando la dispersión intra-clúster sobre un cierto número de iteraciones.
+
+Estadística de Brecha ($GAP_k$): La estadística de brecha para el valor de k dado se calcula como la diferencia entre la dispersión intra-clúster observada y la esperada bajo la referencia nula:
+
+$$GAP_k = \frac{1}{B}\sum_{b=1}^{B}log(W_{kb})-log(W_k)$$
+
+```{r}
+fviz_nbclust(iris_data,kmeans, method = "gap_stat",k.max=20)
+```
+
+# Métodos alternativos de clustering 
+
+
+No todos los problemas se pueden resolver con kmeans, sino que existen técnicas más apropiadas para detectar de forma más efectiva como se compartan los puntos en un conjunto de datos:
+
+```{r}
+df_shapes <- read.csv("multishapes.csv") %>% dplyr::select(x, y)
+```
+
+Calculamos por k - meadias:
+
+```{r}
+set.seed(12345)
+kmedias <- kmeans(df_shapes, 5)
+df_shapes$grupo_kmedias <- kmedias$cluster %>% as.character()
+```
+
+
+## DBSCAN  (Density-Based Spatial Clustering of Applications with Noise)
+
+AHora calculamos por el método debscan:
+
+```{r}
+dbscan_method <- dbscan(df_shapes %>% dplyr::select(x, y), eps = .15, minPts = 5)
+df_shapes$grupo_dmscan <- dbscan_method$cluster %>% as.character()
+```
+
+```{r}
+table(df_shapes$grupo_dmscan)
+```
+
+```{r}
+
+grafico_kmeans <- ggplot(data = df_shapes, aes(x, y, color = grupo_kmedias)) + geom_point()
+grafico_dmscan <- ggplot(data = df_shapes, aes(x, y, color = grupo_dmscan)) + geom_point()
+grafico_kmeans + grafico_dmscan
+```
+
+En Python podemos resolver de la siguiente manera:
+
+Cargamos los paquetes:
+
+```{python}
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.cluster import DBSCAN
+from collections import Counter
+from sklearn.datasets import make_blobs
+import matplotlib.pyplot as plt
+```
+
+Traemos unos datos para desarrollar elmétodo debscan en Python:
+
+```{python}
+
+# Read the CSV file
+df_shapes = pd.read_csv("multishapes.csv")
+
+# Select columns 'x' and 'y'
+df_shapes = df_shapes[['x', 'y']]
+```
+
+Calculamos el método dbscan:
+
+```{python}
+dbscan_method = DBSCAN(eps = 0.15, min_samples = 5, metric = 'euclidean')
+plt.scatter(df_shapes.iloc[:,0], df_shapes.iloc[:,1], c = dbscan_method.fit_predict(df_shapes))
+plt.title('Toy Problem with Minimum Points: ' + str(5))
+plt.show()
+```
+
+EL -1 hace referencia al grupo de outliers:
+
+```{python}
+labels = dbscan_method.fit_predict(df_shapes)
+Counter(labels)
+```
+
+Ilustraremos el método para diferentes valores de epsilon:
+
+```{python}
+XX, yy = make_blobs(n_samples=1000, centers=8, n_features=2, random_state=800)
+# Visualize the data
+plt.scatter(XX[:,0], XX[:,1])
+plt.show()
+```
+
+```{python, warning = FALSE, message = FALSE}
+num_samples = [10,19,20]
+
+for min_num in num_samples:
+    db = DBSCAN(eps=0.7, min_samples=min_num, metric='euclidean')
+    plt.scatter(XX[:,0], XX[:,1], c=db.fit_predict(XX))
+    plt.title('Toy Problem with Minimum Points: ' + str(min_num))
+    plt.show()
+```
+
+Observemos como varía el radio:
+
+```{python}
+epsilons = [0.4,0.7]
+
+for epsilon in epsilons:
+    db = DBSCAN(eps=epsilon, min_samples=10, metric='euclidean')
+    plt.scatter(XX[:,0], XX[:,1], c=db.fit_predict(XX))
+    plt.title('Toy Problem with Minimum Points: ' + str(epsilon))
+    plt.show()
+```
+
+Podemos también entrenar el modelo para cuando lleguen nuevos datos:
+
+```{python}
+# Assuming your data has features 'x' and 'y', select those columns
+
+# Split the data into training and testing sets
+X_train, X_test = train_test_split(df_shapes, test_size=0.2, random_state=12345)
+
+# Initialize DBSCAN model
+dbscan = DBSCAN(eps=0.15, min_samples=5)
+
+# Train the model
+dbscan.fit(X_train)
+
+# Predict cluster labels for the test data
+test_labels = dbscan.fit_predict(X_test)
+print(test_labels)
+```
+
+```{python}
+plt.scatter(X_test.iloc[:,0], X_test.iloc[:,1],
+            c = dbscan_method.fit_predict(X_test))
+plt.title('Toy Problem with Minimum Points: ' + str(5))
+plt.show()
+
+```
+
+## Descripción del método DBSCAN
+
+DBSCAN (Density-Based Spatial Clustering of Applications with Noise) es un algoritmo de clustering basado en densidad. Fue propuesto por Martin Ester, Hans-Peter Kriegel, Jörg Sander y Xiaowei Xu en 1996. El algoritmo tiene como objetivo descubrir clusters de forma arbitraria en un espacio de datos basado en la densidad de los puntos de datos.
+
+### Componentes y Parámetros Clave
+
+Epsilon (ε): Radio máximo de un vecindario de un punto. Este parámetro define qué tan cerca deben estar los puntos para ser considerados vecinos. MinPts: Número mínimo de puntos que deben estar en un vecindario para que un punto sea considerado un punto central (core point).
+
+![](images/clipboard-2074857476.png)
+
+Un vecindario de un punto se define como la región circular con ese punto como el centro y un radio de Epsilon. Cada punto en el conjunto de datos se clasifica en una de las siguientes categorías:
+
+Punto central (Core point): Si hay al menos MinPoints en el vecindario. Punto de borde (Border point): Si este punto se encuentra en el vecindario de un punto central y tiene menos de MinPoints en su propio vecindario. Punto atípico (Outlier point): Tiene menos de MinPoints en su propio vecindario y no tiene ningún otro punto central en su vecindario. Todos los puntos centrales llevan a la formación de un cluster. Si dos clusters tienen 2 o más puntos centrales en su vecindario mutuo, esos clusters se fusionan. Después de este proceso iterativo, nos quedamos con clusters y puntos atípicos.
+
+Esta técnica no depende de inicializaciones aleatorias como lo hace K-means, ya que su enfoque se basa en la densidad de los puntos en el espacio de características.
+
+![](images/clipboard-1614325023.png)
+
+![](images/clipboard-2717180202.png)
+
+Ejemplo de diferentes distancias:
+
+![](images/clipboard-1426748174.png)
+
+DBSCAN (Density-Based Spatial Clustering of Applications with Noise) es útil en situaciones del mundo real en las que los datos tienen una distribución espacial irregular y pueden contener ruido o valores atípicos. Aquí hay algunos escenarios comunes en los negocios y el mundo real donde DBSCAN puede ser preferible sobre K-means:
+
+Detección de anomalías: DBSCAN puede identificar puntos de datos atípicos o ruidosos que no se ajustan a ningún grupo particular. Esto es útil en la detección de fraudes en transacciones financieras, identificación de comportamientos inusuales en sistemas de monitoreo de red, o detectar errores en datos de sensores.
+
+Agrupación de densidad variable: A diferencia de K-means, DBSCAN puede identificar agrupaciones de diferentes formas y tamaños, sin necesidad de especificar el número de clústeres de antemano. Esto es beneficioso en aplicaciones donde los clústeres pueden tener densidades variables o formas irregulares, como la segmentación de clientes en marketing o la agrupación de patrones en datos de imágenes.
+
+Manejo de datos ruidosos: DBSCAN es robusto frente a datos ruidosos y no sensibles a la inicialización de los centroides. Esto lo hace adecuado para conjuntos de datos con ruido o valores atípicos, donde K-means podría verse afectado negativamente por la presencia de estos valores.
+
+Eficiencia computacional: DBSCAN tiene una complejidad de tiempo de ejecución mejor que K-means para conjuntos de datos grandes, ya que no requiere calcular la distancia entre todos los pares de puntos. Esto lo hace más adecuado para aplicaciones de big data o en entornos donde la eficiencia computacional es crucial.
+
+## K - mediodes
+
+El método de K-modes es una extensión del algoritmo K-means, diseñado específicamente para manejar datos categóricos. A diferencia de K-means, que se basa en la distancia euclidiana y requiere datos numéricos, K-modes utiliza una medida de disimilitud para trabajar con datos categóricos.
+
+Ventajas de K-modes Manejo de Datos Categóricos:
+
+K-modes está diseñado específicamente para datos categóricos, lo que lo hace más adecuado que K-means para este tipo de datos. Simplicidad y Eficiencia:
+
+Similar a K-means, el algoritmo K-modes es simple y eficiente, escalando bien con conjuntos de datos grandes. Interpretabilidad:
+
+Los modos (centroides) resultantes son fácilmente interpretables, ya que consisten en valores categóricos representativos de los clústeres.
+
+```{r}
+df_cancer <- read.csv("breast_cancer.csv", header = FALSE) %>% as_tibble()
+names(df_cancer) <- c("class", "age", "mefalsepause", "tumor_size", "inv-falsedes",
+                      "falsede-caps", "deg_malig", "breast", "breast_quad", "irradiat") 
+```
+
+Este conjunto de datos captura diversas características demográficas, patológicas y relacionadas con el tratamiento de los pacientes con cáncer de mama, que pueden ser utilizadas para análisis y potencialmente para predecir resultados de recurrencia.
+
+class (clase) Descripción: Indica si el paciente experimentó una recurrencia del cáncer de mama o no. Valores: "no-recurrence-events" (sin eventos de recurrencia): El paciente no experimentó recurrencia. "recurrence-events" (eventos de recurrencia): El paciente experimentó recurrencia.
+
+age (edad) Descripción: El rango de edad del paciente. Valores: "30-39": La edad del paciente está entre 30 y 39 años. "40-49": La edad del paciente está entre 40 y 49 años. "50-59": La edad del paciente está entre 50 y 59 años. "60-69": La edad del paciente está entre 60 y 69 años. "70-79": La edad del paciente está entre 70 y 79 años.
+
+menopause (menopausia): Descripción: Estado menopáusico del paciente. Valores: "premeno" (premenopáusica): El paciente es premenopáusico. "ge40" (mayor o igual a 40): El paciente tiene 40 años o más y es menopáusico. "lt40" (menor de 40): El paciente tiene menos de 40 años y es menopáusico.
+
+tumor_size (tamaño del tumor): Descripción: El tamaño del tumor en milímetros. Valores: Rangos como "0-4", "5-9", "10-14", "15-19", "20-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54", "55-59".
+
+inv_nodes (nodos invadidos): Descripción: El número de ganglios linfáticos axilares positivos detectados (indicativo de propagación). Valores: Rangos como "0-2", "3-5", "6-8", "9-11", "12-14", "15-17", "18-20", "21-23", "24-26", "27-29", "30-32", "33-35", "36-39".
+
+node_caps (cápsula del nodo): Descripción: Presencia de ganglios linfáticos cancerosos más allá de la cápsula. Valores: "no": No hay ganglios cancerosos más allá de la cápsula. "yes" (sí): Hay ganglios cancerosos más allá de la cápsula.
+
+deg_malig (grado de malignidad): Descripción: Grado de malignidad del tumor, que representa cuán agresivas son las células cancerosas. Valores: 1: Menos agresivo. 2: Moderadamente agresivo. 3: Más agresivo.
+
+breast (mama): Descripción: La mama en la que se detectó el cáncer. Valores: "left" (izquierda): El cáncer se detectó en la mama izquierda. "right" (derecha): El cáncer se detectó en la mama derecha.
+
+breast_quad (cuadrante de la mama): Descripción: El cuadrante de la mama donde se ubicó el tumor. Valores: "left_up" (superior izquierda): Cuadrante superior izquierdo. "left_low" (inferior izquierda): Cuadrante inferior izquierdo. "right_up" (superior derecha): Cuadrante superior derecho. "right_low" (inferior derecha): Cuadrante inferior derecho. "central" (central): Cuadrante central.
+
+irradiat (irradiación): Descripción: Indica si el paciente recibió radioterapia. Valores: "no": El paciente no recibió radioterapia. "yes" (sí): El paciente recibió radioterapia.
+
+```{r}
+df_cancer2 <- df_cancer[,2:10]
+head(df_cancer2)
+```
+
+Utilizamos k-mediodides:
+
+```{r}
+k.centers <- kmodes(df_cancer2, 2, iter.max = 100)
+k.centers
+```
+
+Ejercicio
+
+* EJercicio mushrooms
