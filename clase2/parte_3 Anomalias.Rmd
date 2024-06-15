@@ -1,0 +1,487 @@
+---
+title: "Sesion 3. Análisis de Anomalías"
+author: "Jose Fernando Zea"
+date: "15 de junio de 2024"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(fig.height=3.5)
+```
+
+```{r libreriasr, warning=FALSE, message=FALSE, echo=FALSE}
+library(ggplot2)
+library(reticulate)
+#library(tinytex)
+#tinytex::install_tinytex()
+```
+
+\section{Introducción}
+
+Machine Learning o Aprendizaje máquina es un conjunto de metodologías de predicción y/o prescripción que se utilizan, por ejemplo, para:
+
+-   Recomendar películas, música, libros, noticias, imágenes ó páginas web.
+-   Segmentar clientes basados en atributos comunes y en comportamientos de compra.
+-   Predecir la probabilidad de que un empleado abandone una organización,
+-   Predecir la fuga de un cliente (churn analysis).
+-   Cuantificar la probabilidad de falla de un dispositivo o máquina.
+-   Predecir si un cliente va a estar en mora en los próximos meses.
+-   Predecir la propensión a comprar de un cliente.
+-   Detectar fraude en una transacción en línea.
+
+**Aprendizaje supervisado**
+
+Hay modelos predictivos en donde una variable se predice en términos de otras. Por ejemplo, el valor de una vivienda se puede predecir en términos de diferentes atributos de la vivienda (Ver figura \ref{fig:superficie}. En estos modelos se dispone de variables predictivas (X), que producen una variable respuesta.
+
+-   Las **variables predictivas** se conocen también como variables independientes, explicativas o regresoras. En un lenguaje muy propio del Machine Learning, también se denominan atributos (features).\
+-   La **variable objetivo** se conoce también como variable dependiente, explicada, respuesta o regresada.
+
+Los modelos anteriormente descritos se conocen como modelos de aprendizaje supervisado. La palabra *supervisado* refleja el hecho de que la variable objetivo auxilia o supervisa el aprendizaje dado que se conoce cuál debe ser el resultado. Otra manera de nombrar el objetivo es decir que se conoce la *etiqueta* del resultado. Dados los datos, el algoritmo de aprendizaje optimiza una función para encontrar una combinación de las variables predictivas que esté lo más cercana al valor etiquetaero de la variable objetivo.
+
+La mayoría de los modelos supervisados se pueden clasificar en dos clases de modelos:
+
+**Modelo de regresión**
+
+Cuando el resultado a predecir es una variable continua.
+
+Por ejemplo, en el pronostico del precio de una vivienda la variable a predecir es continua y, dada las combinaciones de los predictores, el valor que se generará estará en el dominio de los reales positivos.
+
+```{r, fig.cap='\\label{fig:superficie}Superficie que relaciona año, metraje y precio de venta de casas', fig.align='center', out.width = "300px"}
+knitr::include_graphics(path = 'regresion.png')
+```
+
+**Modelo de clasificación**
+
+Cuando la variable a predecir es categórica el modelo se denomina *de clasificación*, algunos ejemplos de este tipo de pronósticos son:
+
+-   Clasificar si una persona tomará un crédito que ofrece un banco (SI/NO).
+-   Clasificar si en una fotografía dermatológica el lunar es sospechoso de ser tumoral (SI/NO).
+
+**Aprendizaje no supervisado**
+
+Se denomina aprendizaje no supervisado a los modelos donde no hay una variable objetivo que ayude a optimizarlo. Se busca la definición de conglomerados (clusters). También se usa como técnica de reducción de dimensionalidad.
+
+Las técnicas que se utilizan para la identificación de casos anómalos suelen corresponder a este tipo de aprendizaje.
+
+## Métodos basados en la proximidad
+
+La idea de los métodos basados en la proximidad es modelar los valores atípicos como puntos que están aislados de los datos restantes. Este modelado se puede realizar de tres formas: análisis de conglomerados, análisis basado en densidad o análisis del vecino más cercano (KNN). En análisis de conglomerados y otros métodos basados en la densidad, las regiones densas en los datos se identifican directamente y los valores atípicos se definen como aquellos puntos que no se encuentran en dichas regiones. La principal diferencia entre el análisis de conglomerados y los métodos basados en la densidad es que los primeros segmentan puntos, mientras que los otros segmentan el espacio.
+
+Son métodos que proporcionan un alto nivel de interpretabilidad en cuanto que las regiones de datos dispersas se pueden presentar en términos de combinaciones de los atributos originales. Por ejemplo, los conjuntos de restricciones sobre los atributos originales se pueden presentar como criterios específicos para que los puntos de datos particulares se interpreten como valores atípicos.
+
+### Vecinos más cercanos (KNN)
+
+Es una técnica de clasificación no supervisada cuya concepto es muy sencillo. Clasifica a un nuevo miembro a una *clase* o categoría que ya existe. Lo determina según que sus atributos se parezcan a los casos de una categoría u otra. Se entiende vecindad como similitud debido a que se mide la *distancia* entre los atributos de cada par de casos. De ahí el nombre. Si es *vecino* de dos o más categorías diferentes, se asigna al grupo que cuente con más miembros similares.
+
+Suponga los grupos que se presentan en la Figura \ref{KNN1} y \ref{KNN2}. Se quiere asignar un nuevo punto, en negro. KNN buscará los *k* puntos más cercanos a éste para encontrar la clase dominante del grupo. Para garantizar la existencia de una clase dominante, $k$ debe ser un número impar.
+
+
+```{r, out.width = "25%", fig.cap='\\label{KNN1}Esquema 1 del KNN'}
+knitr::include_graphics("ex1.png")
+```
+
+
+```{r, out.width = "25%", fig.cap='\\label{KNN2}Esquema 2 del KNN'}
+knitr::include_graphics("ex2.png")
+```
+
+En el ejemplo de la Figura \ref{KNN2} se utilizaron las cinco observaciones más cercanas ($K = 5$), para determinar a qué grupo asignar al nuevo *individuo*.
+
+Hay muchas maneras de *medir distancias*. Cada manera se adapta de mejor o peor manera al tipo de atributos con que cuentan los individuos o casos. En cualquier caso, se recomienda *escalar* los atributos antes de aplicarles el algoritmo. *Escalar* una variable significa transformarla de tal modo que se haga comparable a otras, a pesar de que puedan tener escalas muy diferentes. Por ejemplo, el área de un país y su PIB tienen unidades de medida muy diferentes (miles de $km^2$ y miles de dólares). Ambas se pueden tomar como atributos para medir la *distancia* de un país con respecto a los demás. Si el valor máximo de una medida es mucho más grande que el de la otra en varios órdenes de magnitud, entonces dicha variable *dominará*. El escalamiento evita que ocurra.
+
+Una desventaja del procedimiento es que si hay datos faltantes para uno o más individuos, esos individuos los descartará para la comparación. Obliga a asignarle un valor a dichos valores faltantes. Técnicamente se denomina *imputarle* valores a los datos faltantes.
+
+### Local Outlier Factor
+
+El algoritmo LOF usa una idea similar al KNN, pero orientado a detectar datos anómalos. Calcula una puntuación (denominada factor de valor atípico local) que refleja el grado de anomalía de las observaciones. Mide la desviación de la *densidad local* de un punto con respecto a sus vecinos. La idea es detectar las muestras que tienen una densidad sustancialmente menor que sus vecinas.
+
+En la práctica, la densidad local se obtiene de los k vecinos más cercanos. La puntuación LOF de una observación es igual a la relación entre la densidad local promedio de sus k vecinos más cercanos y su propia densidad local. Se espera que un *caso* normal tenga una densidad local similar a la de sus vecinos, mientras que los *casos* anómalos se espera que tengan una densidad local mucho menor.
+
+La fortaleza del algoritmo LOF es que se enfoca en qué tan aislada está la muestra respecto a su vecindario circundante.
+
+# Explicación Local Outlier Factor
+
+1.  La distancia alcanzable (RD) entre el punto A y B se calcula como el máximo entre la tercera mayor distancia a B y la distancia AB. Si el punto cae dentro del radio de la tercera mayor distancia al punto B lse considera como distancia alcanzable la tercera mayor distancia a B, en otro caso se considera la distancia al punto B.
+
+$$RD_{AB}=max(\textit{k-ésima dist} (B),dist(A,B))$$
+
+![](circle_reacheable_distance.png)
+
+2.  La distancia promedio alcanzable al punto A (\$RD_A\$) es el promedio de las distancias alcanzables de los tres vecinos más cercanos a A:
+
+$$\overline{RD}_A=\frac{RD_{AB}+RD_{AC}+RD_{AD}}{3}$$
+
+Si esta medida es muy grande significa que los vecinos de A están muy alejados, en otras palabras hay una baja densidad alrededor de A, o en otras palabras es baja la densidad local alcanzable:
+
+\$$LRD_A = \frac{1}{\overline{RD}_A}$\$
+
+3.  La distancia alcanzable de A también puede calcularse en las vecindades de A, es decir, calcular $LRD_B$, $LRD_C$ y $LRD_D$ y calcular la densidad promedio de los vecinos de A:
+
+$$\frac{LRD_B + LRD_C + LRD_D}{3}$$
+
+4.  El factor de Outlier Local es el cociente entre el promedio de las densidades locales de los vecinos de A sobre la densidad local del punto A:
+
+$$LOF_A = \frac{\frac{1}{3}\left(LRD_B + LRD_C + LRD_D\right)}{LRD_A}$$
+
+**Interpretación LOF:** a continuación se muestra algunos valores del índice LOF:
+
+![](Valores_LOF.png)
+
+En python de utiliza el módulo *LocalOutlierFactor* de la librería scikit_learn.
+
+Ejemplo en python con datos simulados:
+
+```{python librerias_python, echo=TRUE}
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.metrics import confusion_matrix
+from sklearn import datasets
+import random
+from plotnine import ggplot, geom_point, aes, geom_abline
+```
+
+```{python, echo=TRUE}
+np.random.seed(42)
+# datos de entrenamiento: 2100 numeros aleatorias de distribución normal 
+# con media cero y desviacion estandar 0.3
+X_inliers = np.random.normal(0, 0.3, 200)
+# Se convierte a 100 duplas para generar un scatter plot de 2 ejes
+X_inliers = np.reshape(X_inliers, (-1, 2))
+# Se concatenan, creando 200 duplas.
+X_inliers = np.r_[X_inliers + 2, X_inliers - 2]
+
+# Generacion de 20 duplas de outliers (10%) de números aleatorios entre -4 y 4
+X_outliers = np.random.uniform(low=-4, high=4, size=(20, 2))
+# Se concatenan en la variable X
+X = np.r_[X_inliers, X_outliers]
+
+n_outliers = len(X_outliers)
+## Crea un arreglo de "unos" de la misma longitud que X
+etiqueta = np.ones(len(X), dtype=int)
+# Le asigna la etiqueta -1 a los outliers (los 20 ultimos)
+etiqueta[-n_outliers:] = -1
+```
+
+Se puede acceder a las puntuaciones de anomalía de las muestras de entrenamiento mediante el atributo *negative_outlier_factor*.
+
+```{python, echo=TRUE}
+# ajuste el modelo 
+clf = LocalOutlierFactor(n_neighbors = 20, contamination = 0.1)
+# use fit_predict para calcular el número de errores al comparar 
+# con las etiquetas asignadas a la muestra de entrenamiento.
+y_pred = clf.fit_predict(X)
+n_errors = (y_pred != etiqueta).sum()
+X_scores = clf.negative_outlier_factor_
+# np.random.choice(X_scores, 20) # Vea una muestra de "puntajes"
+```
+
+```{python, echo=TRUE}
+plt.title("Local Outlier Factor (LOF)")
+plt.scatter(X[:, 0], X[:, 1], color='k', s=3., label='Puntos a evaluar')
+# los circulos son proporcionales al puntaje de outlier
+radius = (X_scores.max() - X_scores) / (X_scores.max() - X_scores.min())
+plt.scatter(X[:, 0], X[:, 1], s=1000 * radius, edgecolors='r',
+            facecolors='none', label='Puntaje como anómalo')
+plt.axis('tight')
+plt.xlim((-5, 5))
+plt.ylim((-5, 5))
+plt.xlabel("Error de predicción: %d" % (n_errors))
+legend = plt.legend(loc='upper left')
+legend.legendHandles[0]._sizes = [10]
+legend.legendHandles[1]._sizes = [20]
+plt.show()
+```
+
+
+
+
+El error de predicción puede ser porque *coincidió* el número aleatorio *outlier* con los *inliers*, o por números aleatorios *inliers* muy apartados de la media. La matriz de confusión presenta esos errores:
+
+```{python, echo=TRUE}
+from sklearn.metrics import confusion_matrix
+cm = confusion_matrix(etiqueta, y_pred)
+cm
+```
+
+Usualmente como regla empírica se considera que los valores con un LOF mayor a 1.5 se consideran como puntos anómalos aunque esto depende mucho del valor de k (número de vecinos).
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(Rlof)
+data(iris)
+df <-iris[,1:2]
+lof_scores  <- lof(df, c(2, 5, 15), cores = 2)
+df$outliers_2 <- ifelse(lof_scores[,1] >= 2, "outlier", "no outlier")
+df$outliers_5 <- ifelse(lof_scores[,2] >= 2, "outlier", "no outlier")
+df$outliers_15 <- ifelse(lof_scores[,3] >= 2, "outlier", "no outlier")
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(ggplot2)
+ggplot(data = df, aes(x = Sepal.Length, y = Sepal.Width, colour = outliers_2 )) + 
+  geom_point() 
+  
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(ggplot2)
+ggplot(data = df, aes(x = Sepal.Length, y = Sepal.Width, colour = outliers_5 )) + 
+  geom_point() 
+  
+```
+
+```{r, warning=FALSE, message=FALSE, echo=FALSE}
+library(ggplot2)
+ggplot(data = df, aes(x = Sepal.Length, y = Sepal.Width, colour = outliers_15)) + 
+  geom_point() 
+  
+```
+
+```{python, echo = TRUE}
+iris = datasets.load_iris()
+iris_df = pd.DataFrame(iris.data, columns=iris.feature_names)
+iris_df['target'] = iris['target']
+iris_df.columns = ['sepal_length', 'sepal_width', 'petal_length',
+       'petal_width', 'species']
+```
+
+```{python, echo=TRUE}
+clf = LocalOutlierFactor(n_neighbors = 5, novelty = False)
+# use fit_predict para calcular el número de errores al comparar 
+# con las etiquetas asignadas a la muestra de entrenamiento.
+X = iris_df[['sepal_length', 'sepal_width']]
+y_pred = clf.fit_predict(X)
+lof_scores = -1 * clf.negative_outlier_factor_
+outlier_5 = lof_scores > 2
+unique, counts = np.unique(outlier_5, return_counts=True)
+unique, counts
+# np.random.choice(X_scores, 20) # Vea una muestra de "puntajes"
+```
+
+```{python, echo=TRUE}
+clf = LocalOutlierFactor(n_neighbors = 15, novelty = False)
+# use fit_predict para calcular el número de errores al comparar 
+# con las etiquetas asignadas a la muestra de entrenamiento.
+X = iris_df[['sepal_length', 'sepal_width']]
+y_pred = clf.fit_predict(X)
+lof_scores = -1 * clf.negative_outlier_factor_
+outlier_15 = (lof_scores > 2)+0
+unique, counts = np.unique(outlier_15, return_counts=True)
+unique, counts
+# np.random.choice(X_scores, 20) # Vea una muestra de "puntajes"
+```
+
+```{python, echo = TRUE}
+iris_df['outlier_15'] = outlier_15
+```
+
+```{python, echo = TRUE, eval = FALSE}
+(ggplot(iris_df, aes('sepal_length', 'sepal_width', color = 'factor(outlier_15)')) 
+ + geom_point())
+```
+
+# Árboles de decisión
+
+```{r, fig.cap='\\label{fig:arbol}Árbol', fig.align='center', out.width = "300px"}
+knitr::include_graphics(path = 'Arbol.png')
+```
+
+Es una técnica previa al Machine Learning. Se utilizaba para estratificar variables en grupos lo más homogéneos posibles. Estratificación entendida en términos de muestreo. Lo que se busca es encontrar valores de corte en una ó mas variables explicativas de tal modo que la variable de interés quede dividida en grupos (estratos) lo más homogéneos posibles.
+
+Es una técnica no supervisada para pronosticar el valor asignándole el promedio de dicho grupo o para clasificar la ubicación de la variable de interés en alguno de los grupos.
+
+Para problemas en que se desea asignar el promedio del grupo, la técnica determina para cada variable una sucesión de puntos que divida la base en dos particiones ($P_1\text{ y }P_2$) y determina en cuál es menor la suma del cuadrado de los errores (SCE): $$SCE = \sum_{i \in P_1}(y_i - \bar{y}_1)^2 + \sum_{i \in P_2}(y_i - \bar{y}_2)^2$$
+
+En la Figura \ref{fig:cortes}, de los diferentes cortes, probablemente el tercero es el que genere la menor SCE.
+
+```{r, fig.cap='\\label{fig:cortes}Puntos de corte para la partición', fig.align='center', out.width = "300px"}
+knitr::include_graphics(path = 'Cortes.png')
+```
+
+Se realiza tal selección para cada una de las variables predictoras y se elige para la primera partición la variable que obtenga el menor valor de SCE. Recursivamente se vuelve a realizar tal algoritmo para cada partición ($P_1\text{ y }P_2$) volviendo a particionar cada rama. Esto quiere decir que vuelve a utilizar variables que ya han sido elegidas para una partición anterior. Se trata de una técnica computacionalmente intensa, pero veloz.
+
+```{r, fig.cap='\\label{fig:split}Esquema de funcionamiento de un árbol', fig.align='center', out.width = "300px"}
+knitr::include_graphics(path = 'Arbol_splits.png')
+```
+
+La Figura \ref{fig:split} representa el proceso. El primer corte se realizó sobre la variable X1. El segundo corte se realzó sobre la partición de la derecha respecto a la variable x2. El proceso puede continuar hasta que sólo haya un elemento en cada grupo.
+
+A medida se profundiza un árbol se tiende al *sobreajuste*. Éste se limita fijando criterios acerca del número mínimo de nodos (hojas) por rama o la máxima profundidad.
+
+En general, si no hay demasiadas variables respecto a los recursos computacionales disponibles, se permite crecer al árbol completamente y luego se *poda* (prune) con el objeto de hacer más sencillo el modelo. La sencillez o parsimonia se denomina, en este contexto, nivel de *pureza*. Al ser más sencillo es más eficiente, disminuirá el sobreajuste y no perderá eficacia.
+
+En problemas de clasificación lo único que cambia es el criterio con que se subdivide el árbol. Un árbol tiene mayor *pureza* si cada partición tiene una mayor proporción de nodos de una de las *clases* o categorías en las que se están clasificando las variables.
+
+La poda de un árbol utiliza la técnica de *regularización*, consistente en una penalización asociada al costo y/o complejidad del árbol. La complejidad se refiere al número de nodos terminales. A menor número, menos complejo. $$SCE_{\text{Complexity Parameter}} = SCE + (\alpha)(\text{número de nodos terminales})$$
+
+A menor penalización, mayor complejidad, y viceversa.
+
+Para seleccionar la mejor *poda* se evalúan los datos para una sucesión de diferentes valores del parámetro de complejidad ($\alpha$ ó CP).
+
+Los árboles tienen la ventaja de que es entendible el resultado, se pueden identificar las variables más importantes para la clasificación o regresión y maneja sin problemas los *missing data*. Los ignora, pero utiliza la información de las restantes variables de las que sí se tiene información. Y maneja indistintamente variables numéricas, densas o disgregadas, y categóricas.
+
+Se presenta una ligera desventaja si hay variables muy correlacionadas. Si hay dos predictores muy correlacionados, la selección de uno de estos dos para la partición es como si se realizara al azar ya que la diferencia se deberá a diferencias aleatorias en los datos de entrenamiento. Si se eliminara de la data una de las dos variables, la otra podría ser seleccionada dos veces, en dos ramas distintas, realzando su importancia relativa, lo cual tal vez no ocurriría si están presentes ambas. También puede ser desventajoso el hecho de que variables con mayor cardinalidad en el número de diferentes valores son más favorecidos que aquellas con relativamente pocos valores distintos.
+
+```{r, fig.cap='\\label{fig:desventaja}Desventaje del árbol', fig.align='center', out.width = "300px"}
+knitr::include_graphics(path = 'Desventaja_trees.png')
+```
+
+Obsérvese que el espacio de partición de la data es rectangular. Los árboles pueden dar resultados menos óptimos que otras técnicas. Y alterando levemente los datos, el árbol resultante puede llegar a ser sustancialmente diferente. Por esa razón surgieron las técnicas de *ensamble* de árboles, que promedian los resultados de multitud de árboles con el objeto de obtener resultados estables y que han probado obtener resultados incluso mejores que otras técnicas.
+
+## Isolation forest[^1]
+
+[^1]: Gráfica tomada de "cubonacci"
+
+```{r, fig.cap='\\label{fig:arbol}Árbol aislado', fig.align='center', out.width = "300px"}
+knitr::include_graphics(path = 'Isolated tree.png')
+```
+
+Para aislar un dato se selecciona aleatoriamente una característica y luego se selecciona aleatoriamente un valor de separación.
+
+```{r, fig.cap='\\label{fig:arbol2}Árbol aislado', fig.align='center', out.width = "300px"}
+knitr::include_graphics(path = 'Isolated tree2.png')
+```
+
+Dado que la partición se aplica de nuevo a los resultado se puede representar mediante una estructura de árbol. El número de divisiones necesarias para aislar una muestra es equivalente a la longitud de la ruta desde el nodo raíz hasta el nodo de terminación. En el ejemplo de la Figura \ref{fig:arbol} bastó con dos procesos de división, pero se podría continuar, como en la Figura \ref{fig:arbol2}.
+
+De lo que se trata es de aislar datos en un conjunto de árboles independientemente unos de otros, cada uno a partir de un conjunto de datos diferente y *ensamblar* un resultado. Por ello se denomina un *ensamble* de árboles. Para encontrar árboles diferenciados se construyen submuestras de datos mediante la técnica del *bootstrap*: un muestreo con repetición del tamaño del conjunto original. Si bien no es intuitivo el método de emsamblaje (bagging en inglés), este método propuesto en 1996 funciona muy bien para muchos tipos de modelos. Obtiene mejora en las predicciones y reduce la varianza de éstas. Luego hubo una mejorá que se denominó *Random Forest*. Es una mejora frente al paradigma del *bagging* en el sentido que evita que haya correlación entre árboles. ¿Cómo? Además de *muestrear con reemplazo individuos*, *muestrea variables aleatoriamente sin reemplazo*. Si bien el método del Isolation Forest no es el mismo, el principio sí, y por ello se denominó de esta manera.
+
+Para determinar la predicción del Isolation Forest se utiliza *el voto de la mayoría* (la moda) para problemas de clasificación y el *promedio* para los problemas de regresión. Puede ser un promedio ponderado.
+
+La partición aleatoria produce trayectorias notablemente más cortas para las anomalías, por lo tanto, cuando un bosque de árboles aleatorios produce colectivamente recorridos más cortos para muestras particulares, es muy probable que lo sean.
+
+```{r, fig.cap='\\label{fig:ensamble}Ensamble de árboles', fig.align='center', out.width = "300px"}
+knitr::include_graphics(path = 'Isolated forest.png')
+```
+
+Ejemplo en python
+
+```{python, echo=TRUE}
+from sklearn.ensemble import IsolationForest
+import warnings
+warnings.filterwarnings("ignore") 
+```
+
+```{python, echo=TRUE}
+df = pd.read_csv('medidas_cuerpo2.csv')
+df.head(6)
+```
+
+Se procede a definir el modelo:
+
+```{python, echo=TRUE}
+model=IsolationForest(n_estimators = 50, max_samples = 'auto', \
+    contamination = float(0.1), max_features = 1.0)
+model.fit(df[['Peso']])
+```
+
+Se añaden los puntajes y las etiquetas en la base de datos:
+
+```{python, echo=TRUE}
+df['puntaje'] = model.decision_function(df[['Peso']])
+df['anomalo'] = model.predict(df[['Peso']])
+df[["Peso", "puntaje", "anomalo"]].head(6)
+```
+
+Imprímanse sólo los anómalos:
+
+```{python, echo=TRUE}
+anomalia = df.loc[df['anomalo'] == -1]
+anomalia_index = list(anomalia.index)
+print(anomalia)
+```
+
+Sea ahora el análisis multidimensional:
+
+```{python, echo=TRUE}
+df = pd.read_csv('medidas_cuerpo2.csv')
+df = df[["Peso", "Estatura", "circun_cuello", "circun_muneca"]]
+model = IsolationForest(max_samples = 100)
+model.fit(df)
+```
+
+Las cuatro variables se usan como *predictores*:
+
+```{python, echo=TRUE}
+df['puntaje'] = model.decision_function(df[["Peso", "Estatura", "circun_cuello", "circun_muneca"]])
+df['anomalo'] = model.predict(df[["Peso", "Estatura", "circun_cuello", "circun_muneca"]])
+```
+
+Resultado:
+
+```{python, echo=TRUE}
+anomalia = df.loc[df['anomalo'] == -1]
+anomalia_index = list(anomalia.index)
+print(anomalia)
+```
+
+Los mismos tres casos que etiquetó con solo el Peso.
+
+**Ejemplo**
+
+```{python, echo=TRUE}
+df = pd.read_csv('PimaIndiansDiabetes.csv', index_col=[0])
+df.head(6)
+```
+
+Este conjunto de datos es originalmente del Instituto Nacional de Diabetes y Enfermedades Digestivas y Renales de EEUU. El objetivo del conjunto de datos es predecir de forma diagnóstica si un paciente tiene diabetes o no, basándose en determinadas medidas de diagnóstico incluidas en el conjunto de datos. Se impusieron varias restricciones a la selección de estas instancias de una base de datos más grande. En particular, todos los pacientes aquí son mujeres de al menos 21 años de edad de origen indio Pima.
+
+Se utilizará para detectar un conjunto de individuos *anómalos* en sus medidas médicas, independientemente de que temngan diabetes o no..
+
+Se convierte la etiqueta a un número binario. "1" si tiene diabetes, "0" de lo contrario.
+
+```{python, echo=TRUE}
+#df[['diabetes']] = np.where(df['diabetes'].str.contains("pos"), 1, 0)
+df['diabetes'] = np.where(df['diabetes'].str.contains("pos"), 1, 0)
+df.head(6)
+```
+
+Obsérvese que hay datos con *missing values*. Infortunadamente, a diferencia de los árboles de decisión, *Isolation Forest* requiere sólo casos con datos completos.
+
+```{python, echo=TRUE}
+# Se elimina la etiqueta que no interesa
+# X = df.iloc[:,:-1]
+X = df
+# Sólo datos completos, sin NaN
+X.dropna(axis = 0, how = 'any', inplace = True)
+X.head(6)
+```
+
+Se ajusta el modelo, y como se tienen un data frame de pandas, se reforma a una matriz, la entrada requerida para el modulo de Isolation Forest.
+
+```{python, echo=TRUE}
+model = IsolationForest(max_samples = 100) # Puede colocarse como parámetro contamination = valor
+X_matrix = X.values.reshape(-1, 9) # Número de features
+len(X_matrix) # filas
+len(X_matrix[0]) # columnas
+model.fit(X_matrix)
+```
+
+Todas las variables se usan como *predictores*.
+
+Se añaden las columnas al data frame de pandas:
+
+```{python, echo=TRUE}
+X['puntaje'] = model.decision_function(X_matrix)
+X['anomalo'] = model.predict(X_matrix)
+```
+
+Resultado:
+
+```{python, echo=TRUE}
+# anomalia = X.loc[X['anomalo'] == -1]
+# df.loc[df['column_name'] == some_value]
+anomalia = X[X['anomalo'] == -1]
+anomalia_index = list(anomalia.index)
+print(anomalia)
+```
+
+Por defecto toma el 10% de los casos como anómalos.
+
+Hay tanto personas diabéticas como no diabéticas.
+
+**Ejercicio**
+
+Realice el mismo ejercicio, pero separando los individuos con diabetes y sin diabetes.

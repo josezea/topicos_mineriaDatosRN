@@ -1,0 +1,136 @@
+---
+title: "Identiticación de atípicos"
+author: "José Fernando Zea"
+date: "2024-06-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{python}
+import numpy as np
+import pandas as pd
+import plotnine 
+import statsmodels.formula.api as smf
+from plotnine import ggplot, geom_point, aes, geom_abline
+```
+
+
+```{python}
+datos = pd.read_csv("medidas_cuerpo2.csv")
+```
+
+
+
+```{python}
+lm=smf.ols(formula = "Peso ~ Estatura", data = datos).fit()
+lm.params
+```
+
+
+```{python}
+lm.rsquared
+```
+
+
+```{python}
+n=datos.shape[0]
+p=2
+influence = lm.get_influence()
+```
+
+
+# Residuales estudentizados
+
+```{python}
+resid_student = influence.resid_studentized_external
+datos[['outlier_residstud_rls']] = np.where(abs(resid_student) >= 2, 1, 0)
+(ggplot(datos, aes('Estatura', 'Peso', color='factor(outlier_residstud_rls)'))
+ + geom_point()
+ + geom_abline(intercept = lm.params[0], slope = lm.params[1], color = "black"))
+```
+
+
+# Distancia de Cook
+
+Referencia: https://fhernanb.github.io/libro_regresion/diag2.html#distancia-de-cook
+
+```{python}
+(cooks, p) = influence.cooks_distance
+datos[['outlier_cook_rls']] = np.where(cooks >= 4 /(n-2-2), 1, 0)
+(ggplot(datos, aes('Estatura', 'Peso', color='factor(outlier_cook_rls)'))
+ + geom_point()
+ + geom_abline(intercept = lm.params[0], slope = lm.params[1], color = "black"))
+```
+
+
+# DFFIT
+
+Referencia:https://fhernanb.github.io/libro_regresion/diag2.html#dffits
+
+```{python}
+(dffits, p) = influence.dffits
+datos[['outlier_dffit_rls']] = np.where(dffits > 2 / np.sqrt(p/n), 1, 0)
+(ggplot(datos, aes('Estatura', 'Peso', color='factor(outlier_dffit_rls)'))
+ + geom_point()
+ + geom_abline(intercept = lm.params[0], slope = lm.params[1], color = "black"))
+```
+
+
+# Leverege
+
+```{python}
+leverage = influence.hat_matrix_diag
+datos[['influential_hat']] = np.where(leverage >= 2*p/n, 1, 0)
+(ggplot(datos, aes('Estatura', 'Peso', color='factor(influential_hat)'))
+ + geom_point()
+ + geom_abline(intercept = lm.params[0], slope = lm.params[1], color = "black"))
+```
+
+
+# Regresión múltiple
+
+
+```{python}
+datos = pd.read_csv("medidas_cuerpo2.csv")
+lm2 = smf.ols(formula = "Peso~Estatura+circun_cuello+circun_muneca", data = datos).fit()
+n=datos.shape[0]
+p=4
+lm2.params
+```
+
+
+```{python}
+influence_rlm = lm2.get_influence()
+resid_student_rlm = influence_rlm .resid_studentized_external
+(cooks_rlm, p_cooks_rlm) = influence_rlm.cooks_distance
+(dffits_rlm, p_dffits_rlm) = influence_rlm.dffits
+leverage_rlm = influence_rlm.hat_matrix_diag
+```
+
+
+
+```{python}
+datos[['outlier_residstud_rlm']] = np.where(abs(resid_student_rlm) >= 2, 1, 0)
+datos[['outlier_cook_rlm']] = np.where(cooks_rlm >= 4 /(n-2-2), 1, 0)
+datos[['outlier_dffit_rlm']] = np.where(dffits_rlm > 2 * np.sqrt(p/n), 1, 0)
+datos[['influential_hat_rlm']] = np.where(leverage_rlm >= 2*p/n, 1, 0)
+```
+
+
+```{python}
+df_outliers = datos.query('outlier_residstud_rlm == 1 | outlier_cook_rlm == 1 | outlier_dffit_rlm == 1')
+df_outliers
+```
+
+
+
+```{python}
+df_outliers = df_outliers.drop(['outlier_residstud_rlm','outlier_cook_rlm', 'outlier_dffit_rlm', 'influential_hat_rlm'], 1)
+df_outliers
+```
+
